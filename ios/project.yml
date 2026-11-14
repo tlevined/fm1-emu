@@ -1,0 +1,122 @@
+# The iOS app and its AUv3 plugin, as an XcodeGen spec (the .xcodeproj is generated: xcodegen
+# generate). BUNDLE_PREFIX (e.g. com.yourname) and DEVELOPMENT_TEAM come from the environment;
+# .github/workflows/ios.yml sets them. Before generating, the build puts:
+#   ../target/aarch64-apple-ios/release/libfm1_ios.a   the emulator (cargo build -p fm1-ios)
+#   App/site/                                          the web app (web/build.sh App/site)
+#   AU/sidplayer.fwsc                                  FM-1 SID, the plugin's built-in firmware
+name: FM1
+options:
+  bundleIdPrefix: ${BUNDLE_PREFIX}
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.5.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "2"
+    FM1_APP_GROUP: group.${BUNDLE_PREFIX}.fm1
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    DEAD_CODE_STRIPPING: YES
+targets:
+  FM1:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - "site"
+          - "site/**"
+          - "midi-shim.js"
+      - path: App/midi-shim.js
+        buildPhase: resources
+      - path: App/site
+        type: folder
+        buildPhase: resources
+        optional: true
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_PREFIX}.fm1
+        PRODUCT_NAME: FM-1
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: FM-1
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIRequiresFullScreen: false
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIBackgroundModes:
+          - audio
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSBluetoothAlwaysUsageDescription: Connects Bluetooth MIDI keyboards and controllers to the synth.
+        ITSAppUsesNonExemptEncryption: false
+        FM1AppGroup: $(FM1_APP_GROUP)
+    entitlements:
+      path: App/FM1.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(FM1_APP_GROUP)
+    dependencies:
+      - target: FM1AU
+        embed: true
+  FM1AU:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: AU
+        excludes:
+          - "sidplayer.fwsc"
+          - "Bridging.h"
+      - path: AU/sidplayer.fwsc
+        buildPhase: resources
+        optional: true
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ${BUNDLE_PREFIX}.fm1.au
+        PRODUCT_NAME: FM1AU
+        SWIFT_OBJC_BRIDGING_HEADER: AU/Bridging.h
+        HEADER_SEARCH_PATHS: $(SRCROOT)/../crates/fm1-ios/include
+        LIBRARY_SEARCH_PATHS: $(SRCROOT)/../target/aarch64-apple-ios/release
+        OTHER_LDFLAGS: -lfm1_ios
+        APPLICATION_EXTENSION_API_ONLY: YES
+    info:
+      path: AU/Info.plist
+      properties:
+        CFBundleDisplayName: FM-1 AUv3
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        FM1AppGroup: $(FM1_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.AudioUnit-UI
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).AudioUnitViewController
+          NSExtensionAttributes:
+            AudioComponents:
+              - description: The M-VAVE FM-1 emulated, with its community firmwares
+                manufacturer: Fm1e
+                name: "FM-1 Emulator: FM-1"
+                sandboxSafe: true
+                subtype: fm1x
+                tags:
+                  - Synthesizer
+                type: aumu
+                version: 1
+    entitlements:
+      path: AU/FM1AU.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(FM1_APP_GROUP)

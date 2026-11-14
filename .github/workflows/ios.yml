@@ -1,0 +1,115 @@
+# The iOS app (the emulator's page with CoreMIDI) and its AUv3 plugin, built, signed and uploaded
+# to TestFlight. Run it from Actions -> "iOS app" -> Run workflow (or on a push that changes them).
+#
+# Set up once (ios/README.md has the steps):
+#   variables  BUNDLE_PREFIX    e.g. com.yourname (the app is BUNDLE_PREFIX.fm1)
+#   secrets    TEAM_ID          your Apple Developer team ID
+#              ASC_KEY_ID       App Store Connect API key ID (Admin role)
+#              ASC_ISSUER_ID    its issuer ID
+#              ASC_KEY_P8       the .p8 key file, base64-encoded
+
+name: iOS app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - ios/**
+      - crates/fm1-ios/**
+      - crates/fm1-core/**
+      - crates/fm1-soc/**
+      - web/**
+      - tools/build_ios.sh
+      - .github/workflows/ios.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios
+  cancel-in-progress: true
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      BUNDLE_PREFIX: ${{ vars.BUNDLE_PREFIX }}
+      DEVELOPMENT_TEAM: ${{ secrets.TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true      # fm1-sid/: the plugin's built-in firmware
+
+      - name: Check the settings
+        run: |
+          missing=""
+          [ -n "$BUNDLE_PREFIX" ] || missing="$missing BUNDLE_PREFIX(variable)"
+          [ -n "$DEVELOPMENT_TEAM" ] || missing="$missing TEAM_ID"
+          [ -n "${{ secrets.ASC_KEY_ID }}" ] || missing="$missing ASC_KEY_ID"
+          [ -n "${{ secrets.ASC_ISSUER_ID }}" ] || missing="$missing ASC_ISSUER_ID"
+          [ -n "${{ secrets.ASC_KEY_P8 }}" ] || missing="$missing ASC_KEY_P8"
+          if [ -n "$missing" ]; then echo "::error::Set these in Settings -> Secrets and variables -> Actions:$missing"; exit 1; fi
+          xcodebuild -version
+
+      - name: Tools
+        run: |
+          brew install xcodegen
+          command -v cargo || { curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal; echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"; }
+
+      - name: The emulator, the web app and the Xcode project
+        run: tools/build_ios.sh
+
+      - name: The emulator's iOS core passes its tests (on this Mac)
+        run: FM1_NO_JIT=1 FM1_TEST_FWSC=fm1-sid/web/sidplayer.fwsc cargo test --release -p fm1-ios -- --nocapture --test-threads 1
+
+      - name: App Store Connect key
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          echo "${{ secrets.ASC_KEY_P8 }}" | base64 --decode > "$RUNNER_TEMP/keys/AuthKey.p8"
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project ios/FM1.xcodeproj -scheme FM1 -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/FM1.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|warning: .*(FM1|fm1)|\*\* ARCHIVE" || true
+          test -d "$RUNNER_TEMP/FM1.xcarchive" || { tail -100 "$RUNNER_TEMP/archive.log"; exit 1; }
+
+      - name: Upload to TestFlight
+        run: |
+          cat > "$RUNNER_TEMP/export.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${DEVELOPMENT_TEAM}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>testFlightInternalTestingOnly</key><true/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/FM1.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+
+      - name: Keep the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: ${{ runner.temp }}/archive.log
+          if-no-files-found: ignore

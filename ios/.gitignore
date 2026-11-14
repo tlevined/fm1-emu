@@ -1,0 +1,5 @@
+# made by the build (ios.yml, build_ios.sh)
+FM1.xcodeproj/
+App/site/
+AU/sidplayer.fwsc
+build/

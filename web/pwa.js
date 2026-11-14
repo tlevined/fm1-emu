@@ -10,7 +10,9 @@ const setting = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch {
 const set = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } };
 
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-const STANDALONE = matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches || navigator.standalone === true;
+// inside the FM-1 iOS app (ios/App): its WKWebView, with CoreMIDI behind Web MIDI (App/midi-shim.js)
+const NATIVE = !!globalThis.fm1Native;
+const STANDALONE = NATIVE || matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches || navigator.standalone === true;
 document.documentElement.toggleAttribute("data-standalone", STANDALONE);
 document.documentElement.toggleAttribute("data-ios", IOS);
 
@@ -27,6 +29,38 @@ const library = globalThis.fm1Library = createLibrary();
 // main.js's controls through a proxy: fm1App exists once main.js has run
 const app = new Proxy({}, { get: (_, k) => globalThis.fm1App?.[k] });
 const controllers = globalThis.fm1Controllers = createControllers(app);
+
+// ---------------------------------------------------------------- the iOS app: the library shared with the AUv3 plugin
+// Every package the library keeps is copied into the app's ROM folder, which the plugin lists; one
+// the library forgets is removed there too (only the ones this page put there).
+export const romFile = (m) => `${m.name}${m.version ? ` ${m.version}` : ""}`.split(/[\/\\:*?"<>|]+/).filter(Boolean).join("-").trim().slice(0, 119) + ".fwsc";
+if (NATIVE) {
+  const EXPORTED = "fm1pwa.exported";
+  const exported = new Set(JSON.parse(setting(EXPORTED, "[]")));
+  const there = new Set(globalThis.fm1Native.roms || []);
+  let syncing = Promise.resolve();
+  const sync = () => (syncing = syncing.then(async () => {
+    let list;
+    try { list = await library.store.list(); } catch { return; }
+    const names = new Set();
+    for (const m of list) {
+      const file = romFile(m);
+      names.add(file);
+      if (there.has(file)) continue;
+      const bytes = await library.store.bytes(m.key);
+      if (!bytes) continue;
+      globalThis.fm1Native.keepRom(file, bytes);
+      there.add(file);
+      exported.add(file);
+    }
+    for (const file of [...exported]) {
+      if (!names.has(file)) { globalThis.fm1Native.deleteRom(file); exported.delete(file); there.delete(file); }
+    }
+    set(EXPORTED, JSON.stringify([...exported]));
+  }).catch(() => {}));
+  library.onChange(sync);
+  sync();
+}
 
 function ready() {
   const a = globalThis.fm1App;
@@ -113,6 +147,11 @@ document.addEventListener("contextmenu", (e) => { if (e.target.closest(".stage")
   }
   hint.querySelector(".close").addEventListener("click", () => { hint.hidden = true; set("fm1pwa.hint", "no"); });
 
+  if (NATIVE) {
+    const bt = Object.assign(document.createElement("button"), { type: "button", textContent: "Bluetooth MIDI…" });
+    bt.addEventListener("click", () => globalThis.fm1Native.bluetooth());
+    bar.querySelector(".wrap").append(bt);
+  }
   const hc = $("pwa-contrast");
   hc.checked = setting("fm1pwa.contrast", "high") === "high";
   hc.addEventListener("change", () => { set("fm1pwa.contrast", hc.checked ? "high" : "normal"); contrast(); });
@@ -129,7 +168,7 @@ document.addEventListener("contextmenu", (e) => { if (e.target.closest(".stage")
 }
 
 // ---------------------------------------------------------------- the service worker, and its updates
-if ("serviceWorker" in navigator && location.protocol !== "file:") {
+if ("serviceWorker" in navigator && location.protocol !== "file:" && !NATIVE) {
   addEventListener("load", async () => {
     try {
       const reg = await navigator.serviceWorker.register("sw.js");

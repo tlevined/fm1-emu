@@ -1,0 +1,14 @@
+[package]
+name = "fm1-ios"
+description = "The FM-1 emulator for iOS: a C interface for an AUv3 instrument (its own thread, a ring the render block pulls, the front panel, controller layouts)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+fm1-core = { path = "../fm1-core" }
+fm1-soc = { path = "../fm1-soc" }
+rtrb = "0.3"
