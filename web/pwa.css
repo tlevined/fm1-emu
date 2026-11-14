@@ -1,0 +1,97 @@
+/* The installable app's additions: its toolbar, the ROM library and controller panels, high
+   contrast (on by default), and touch / full-screen behaviour for an iPad. */
+
+/* ---------------------------------------------------------------- high contrast */
+:root[data-contrast="high"] {
+  --ink: #ffffff; --text: #f2f0ea; --dim: #dedbd3; --faint: #c4c1b9; --line: #8a8b90; --rule: #5a5b60;
+  --amber: #ffb547; --amber-hi: #ffd08a; --card: #17181a; --well: #0e0f10; --room: #0b0c0d; --bar: #0b0c0d;
+}
+:root[data-contrast="high"] body { font-size: 16px; }
+:root[data-contrast="high"] .box,
+:root[data-contrast="high"] .cards li { border-width: 2px; }
+:root[data-contrast="high"] .box button,
+:root[data-contrast="high"] .file,
+:root[data-contrast="high"] select,
+:root[data-contrast="high"] input[type="url"],
+:root[data-contrast="high"] input[type="text"] { border-width: 2px; border-color: var(--line); font-size: 15px; }
+:root[data-contrast="high"] a:focus-visible,
+:root[data-contrast="high"] button:focus-visible,
+:root[data-contrast="high"] select:focus-visible,
+:root[data-contrast="high"] input:focus-visible { outline: 3px solid #ffe14d; outline-offset: 2px; }
+:root[data-contrast="high"] #status { color: var(--text); font-size: 14px; }
+:root[data-contrast="high"] .eyebrow { color: var(--ink); font-size: 13px; }
+:root[data-contrast="high"] .hint span { border-color: var(--line); }
+
+/* ---------------------------------------------------------------- the app's toolbar */
+.pwa-bar { background: var(--bar); border-bottom: 1px solid var(--rule); font-size: 14px; }
+.pwa-bar[hidden] { display: none; }
+.pwa-bar .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding-block: 8px; }
+.pwa-net { font-weight: 600; color: var(--green); }
+.pwa-net[data-off="true"] { color: var(--amber); }
+.pwa-net::before { content: "●"; margin-right: 6px; }
+.check { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--amber); flex: none; }
+.pwa-install, .pwa-update { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-left: auto;
+  border: 2px solid var(--amber); border-radius: 10px; padding: 6px 10px; color: var(--ink); }
+.pwa-install[hidden], .pwa-update[hidden] { display: none; }
+.pwa-bar button, .box button.primary { font: inherit; font-size: 14px; font-weight: 600; border-radius: 8px; padding: 6px 12px;
+  cursor: pointer; border: 2px solid var(--amber); background: var(--amber); color: #1a1003; }
+.pwa-bar button.close { background: none; border-color: var(--line); color: var(--ink); }
+.pwa-bar button[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- the ROM library */
+.lib-box h2 .lib-count { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.lib-usage, .lib-progress, .lib-msg { margin: 0; font-size: 13.5px; color: var(--text); }
+.lib-msg:empty { display: none; }
+.lib-msg[data-error="true"] { color: var(--amber); font-weight: 600; }
+.lib-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.lib-add .lib-url { grid-column: 1 / -1; }
+.lib-box input[type="url"], .lib-box input[type="text"] { font: inherit; font-size: 15px; color: var(--ink); background: var(--well);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; width: 100%; }
+.lib-box details { border: 1px solid var(--rule); border-radius: 10px; padding: 0 12px; background: var(--room); }
+.lib-box details[open] { padding-bottom: 10px; }
+.lib-box summary, .ctl-box summary { padding: 8px 0; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
+.lib-box details p { margin: 0 0 8px; font-size: 13px; }
+.lib-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 420px; overflow-y: auto; }
+.lib-list:empty::before { content: "Nothing kept yet. Play a firmware, or download them all."; color: var(--dim); font-size: 13.5px; }
+.lib-list li { display: grid; gap: 6px; padding: 8px 0; border-top: 1px solid var(--rule); }
+.lib-item { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.lib-item b { color: var(--ink); }
+.lib-item .dim { font-size: 13px; }
+.lib-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.box button.danger { border-color: #ff7a6b; color: #ffb3aa; }
+
+/* catalog cards kept offline */
+.kept-badge { font-size: 12px; font-weight: 700; color: #0b0c0d; background: var(--green); border-radius: 999px; padding: 1px 8px; margin-left: auto; margin-right: 8px; }
+:root[data-contrast="high"] .kept-badge { background: #9fe6ad; }
+
+/* ---------------------------------------------------------------- controllers */
+.ctl-body { display: flex; flex-direction: column; gap: 12px; }
+.ctl-body p { margin: 0; font-size: 13.5px; }
+.ctl-note { color: var(--ink); border-left: 4px solid var(--amber); padding-left: 10px; }
+.ctl-dev { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.ctl-dev > label { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.ctl-dev > label select { max-width: 100%; }
+.ctl-name b { color: var(--ink); font-size: 15px; }
+.ctl-dev details { border: 1px solid var(--rule); border-radius: 10px; padding: 0 12px 4px; background: var(--room); }
+.ctl-dev details .row { margin: 8px 0; }
+.ctl-dev details select { max-width: 100%; flex: 1 1 200px; }
+.ctl-learned { margin: 8px 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 4px; }
+.box button.ctl-x { padding: 0 8px; margin-left: 6px; }
+
+/* ---------------------------------------------------------------- touch and full screen (iPad) */
+.stage, .stage * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.stage { touch-action: none; }
+button, select, label, summary { touch-action: manipulation; }
+@media (hover: none) and (pointer: coarse) {
+  .box button, .file, select, .pwa-bar button { min-height: 44px; }
+  .check input { width: 24px; height: 24px; }
+}
+/* installed: room for the status bar and the home indicator; no site header (the app is the page) */
+:root[data-standalone] body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+:root[data-standalone] header.site .sitenav,
+:root[data-standalone] header.site .gh { display: none; }
+:root[data-standalone] { overscroll-behavior: none; }
+/* (a checkbox stays beside its words) */
+.ctl-dev > label.check { justify-content: flex-start; flex-wrap: nowrap; }
+.ctl-dev > label.check b { margin-right: auto; }

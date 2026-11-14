@@ -241,7 +241,14 @@ async function packageOf(f) {
     packages.set(f.id, got);
     return got;
   }
-  const got = await fetchPackage(f);
+  // (PWA) the ROM library's copy first: plays offline; every download goes into it
+  const lib = globalThis.fm1Library;
+  let got = null;
+  try { got = await lib?.packageFor(f); } catch { /* the library is unavailable: download */ }
+  if (!got) {
+    got = await fetchPackage(f);
+    lib?.keep(f, got).catch(() => {});
+  }
   packages.set(f.id, got);
   noteVersion(f, got.version);
   return got;
@@ -405,7 +412,10 @@ stage.addEventListener("drop", (e) => {
 });
 
 // ---------------------------------------------------------------- drawing
-function draw() {
+let drawnAt = -1e9;
+function draw(t) {
+  if (t !== undefined && t - drawnAt < 15) { requestAnimationFrame(draw); return; }
+  drawnAt = t ?? 0;
   const mem = () => ui.memory.buffer;
   if (frame) {
     if (frame.lcd) {
@@ -631,7 +641,7 @@ function midiConnect() {
   for (const n of names) if (![...midiSel.options].some((o) => o.value === n)) midiSel.add(new Option(n, n));
   if ([...midiSel.options].some((o) => o.value === want)) midiSel.value = want;
   for (const input of midi.inputs.values())
-    input.onmidimessage = want === "*" || want === input.name ? midiMessage : null;
+    input.onmidimessage = (want === "*" || want === input.name) && !globalThis.fm1Controllers?.claims(input) ? midiMessage : null;
 }
 async function midiOpen() {
   if (midi || !navigator.requestMIDIAccess) return midiConnect();
@@ -966,6 +976,17 @@ function boot(options = {}) {
   return bootQueue;
 }
 
+// (PWA) the worklet's code fetched by the page (from the service worker's cache when offline: a
+// worklet's own fetch does not reach it in every browser) and handed over as a blob
+async function workletUrl() {
+  try {
+    const r = await fetch("worklet.js");
+    if (r.ok && typeof Blob !== "undefined" && URL.createObjectURL) {
+      return URL.createObjectURL(new Blob([await r.text()], { type: "text/javascript" }));
+    }
+  } catch { /* the plain path */ }
+  return "worklet.js";
+}
 // the audio graph: a context with the chosen buffer, the emulator's worklet node in it
 async function startAudio(auto = false) {
   ac = new AudioContext({ sampleRate: 44100, latencyHint: latency });
@@ -979,7 +1000,7 @@ async function startAudio(auto = false) {
     ac = null;
     return false;
   }
-  await ac.audioWorklet.addModule("worklet.js");
+  await ac.audioWorklet.addModule(await workletUrl());
   node = new AudioWorkletNode(ac, "fm1", { numberOfInputs: 0, outputChannelCount: [2] });
   node.connect(ac.destination);
   node.port.onmessage = onWorklet;
@@ -1150,6 +1171,7 @@ document.getElementById("update-firmware").addEventListener("click", action(asyn
   const selected = fw;
   saveMessage(`Checking ${selected.name}…`);
   const got = await fetchPackage(selected);
+  globalThis.fm1Library?.keep(selected, got, true).catch(() => {});
   const hash = await packageHash(got.bytes);
   packages.set(selected.id, got);
   noteVersion(selected, got.version);
@@ -1196,3 +1218,25 @@ document.getElementById("open-saved-version").addEventListener("click", action(a
   if (node) await boot();
   else status.textContent = `${record.name} saved version ready: click Start`;
 }));
+
+// ---------------------------------------------------------------- (PWA) the page's controls for its add-ons
+globalThis.fm1App = {
+  catalog, cards, setKey, turn, setPot,
+  get pot() { return pot; },
+  get board() { return board; },
+  get firmware() { return fw; },
+  get running() { return !!running; },
+  leds: () => frame?.leds || [],
+  // played into the MIDI IN jack, as the "MIDI in" picker's inputs are (channel, SMK-37 keys)
+  midiIn: (bytes) => midiMessage({ data: bytes }),
+  midiRefresh: () => midiConnect(),
+  selectFirmware(id) {
+    if (!byId.has(id)) return false;
+    if (fw.id !== id) { fwSel.value = id; fwSel.dispatchEvent(new Event("change")); }
+    return true;
+  },
+  openBytes: (name, bytes) => openLocal(new File([bytes], name)),
+  start: () => (node ? Promise.resolve() : start()),
+  status: (text) => { status.textContent = text; },
+};
+if (typeof dispatchEvent === "function" && typeof CustomEvent === "function") dispatchEvent(new CustomEvent("fm1-ready"));

@@ -28,6 +28,13 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 cp target/wasm/wasm32-unknown-unknown/release/fm1_web.wasm "$OUT/"
 cp web/index.html web/style.css web/main.js web/persistence.js web/tryout.js web/worklet.js web/jit.js web/fwsc.js web/firmwares.json web/fm1-emu-report.pdf web/og.png "$OUT/"
+# the installable app (PWA): its manifest, icons, service worker and add-ons (ROM library, controllers)
+cp web/pwa.js web/pwa.css web/library.js web/controllers.js web/manifest.webmanifest "$OUT/"
+mkdir -p "$OUT/icons"
+cp web/icons/*.png "$OUT/icons/"
+# the service worker's cache is named after this build, so an installed app sees each new one
+BUILD_ID="$(cat "$OUT"/*.js "$OUT"/*.css "$OUT"/*.html "$OUT"/*.json "$OUT"/fm1_web.wasm | sha256sum | cut -c1-12)"
+sed "s/^const BUILD = \"dev\";/const BUILD = \"$BUILD_ID\";/" web/sw.js > "$OUT/sw.js"
 # the SMK-37's page: its own index, catalog and preview, the same code and wasm beside them
 mkdir -p "$OUT/smk37"
 cp web/smk37/index.html web/smk37/firmwares.json web/smk37/og.png "$OUT/smk37/"

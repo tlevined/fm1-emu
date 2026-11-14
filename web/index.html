@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#141517">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FM-1">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>FM-1 Emulator</title>
 <meta name="description" content="The M-VAVE FM-1 pocket synth emulated in the browser: its pi32v2 CPU, screen and audio in WebAssembly, running the community firmwares unchanged.">
 <meta property="og:type" content="website">
@@ -14,8 +21,9 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="Screens of six FM-1 firmwares running in the emulator: X0X, FM1 Quest, AMB-1, FM-1 SID, ORBIT and FiMba-1">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:,">
+<link rel="icon" href="icons/favicon-64.png">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="pwa.css">
 <script>if (new URLSearchParams(location.search).get("embed") === "1") document.documentElement.setAttribute("data-embed", "");</script>
 </head>
 <body>
@@ -30,6 +38,17 @@
     <a class="embed-only" id="fullpage" href="./" target="_blank" rel="noopener">FM-1 emulator, full page ↗</a>
   </div>
 </header>
+<div id="pwa-bar" class="pwa-bar" hidden>
+  <div class="wrap">
+    <span id="pwa-net" class="pwa-net"></span>
+    <label class="check"><input type="checkbox" id="pwa-contrast"> High contrast</label>
+    <div id="pwa-install" class="pwa-install" hidden><span></span>
+      <button type="button" class="primary" hidden>Install</button>
+      <button type="button" class="close" aria-label="Hide the install hint">✕</button></div>
+    <div id="pwa-update" class="pwa-update" role="status" hidden><span>A new version of the app is ready.</span>
+      <button type="button" class="primary">Reload to update</button></div>
+  </div>
+</div>
 <main>
   <div class="player">
     <div class="deck">
@@ -104,6 +123,8 @@
         <label id="midichl" title="Played notes and controllers go to this channel (M-VAVE's firmware listens on 2, Felucca's parts on 1–4)">Channel
           <select id="midich" aria-label="MIDI channel"><option value="0">as sent</option></select></label>
       </section>
+      <section class="box lib-box" id="lib-box" aria-labelledby="h-lib"></section>
+      <section class="box ctl-box" id="ctl-box" aria-labelledby="h-ctl"></section>
     </aside>
   </div>
 
@@ -341,6 +362,7 @@
     </div>
   </div>
 </footer>
+<script type="module" src="pwa.js"></script>
 <script type="module" src="main.js"></script>
 </body>
 </html>
